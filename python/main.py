@@ -43,7 +43,7 @@ def main():
                     clear()
                     os.system(f"title GoChinese Helper ^| {courses[course-1]}")
                     
-                    answers = json.loads(requests.get(f"https://lauchaksing.ct.ws/GoChinese-Helper/answers/{courses[course-1]}.json").text)
+                    answers = json.loads(requests.get(f"https://lauchaksing.github.io/GoChinese-Helper/answers/{courses[course-1]}.json").text)
                     print("Please input number to choose the chapter:")
                     
                     for i in list(answers.keys()):
