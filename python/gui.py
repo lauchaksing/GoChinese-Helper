@@ -35,7 +35,7 @@ except Exception:                       # pragma: no cover
 #  Constants / Config
 # ============================================================
 APP_NAME      = "GoChinese Helper"
-VERSION       = "1.1.0"
+VERSION       = "1.1.1"
 BASE_URL      = "https://lauchaksing.github.io/GoChinese-Helper"
 COURSES       = ["LCC1010", "LCC2010"]
 ICON_FILE     = "icon.ico"
@@ -512,13 +512,25 @@ class GoChineseHelper:
         return box.get("v")
 
     def _dialog(self, title: str, message: str,
-                ok_text: str = "OK", cancel_text: str | None = None) -> bool:
+                ok_text: str = "OK", cancel_text: str | None = None,
+                topmost: bool = False, bell: bool = False) -> bool:
         top = tk.Toplevel(self.root)
         top.title(title)
         top.configure(bg=BG)
         top.resizable(False, False)
         top.transient(self.root)
         self._apply_icon_to(top)
+        if topmost:
+            # 重要提示用獨立置頂視窗，避免只出現在狀態列被忽略
+            try:
+                top.attributes("-topmost", True)
+            except Exception:
+                pass
+        if bell:
+            try:
+                top.bell()
+            except Exception:
+                pass
         top.grab_set()
 
         frame = tk.Frame(top, bg=BG, padx=24, pady=20)
@@ -559,9 +571,28 @@ class GoChineseHelper:
         self.root.wait_window(top)
         return result["v"]
 
-    def _show_info(self, title: str, message: str, ok_text: str = "OK"):
+    def _show_info(self, title: str, message: str, ok_text: str = "OK",
+                   topmost: bool = False, bell: bool = False):
         with self._modal_lock:
-            self._run_on_ui(lambda: self._dialog(title, message, ok_text=ok_text))
+            self._run_on_ui(lambda: self._dialog(
+                title, message, ok_text=ok_text,
+                topmost=topmost, bell=bell,
+            ))
+
+    def _notify_comment(self, data: dict) -> None:
+        """該題組若帶 comment，用獨立置頂視窗顯示，不再只靠狀態列（容易被忽略）。"""
+        if not isinstance(data, dict):
+            return
+        comment = str(data.get("comment") or "").strip()
+        if not comment:
+            return
+        self._show_info(
+            "⚠️  Important Note",
+            comment,
+            ok_text="Got it",
+            topmost=True,
+            bell=True,
+        )
 
     def _confirm(self, title: str, message: str,
                  ok_text: str = "Continue", cancel_text: str = "Cancel") -> bool:
@@ -912,6 +943,8 @@ class GoChineseHelper:
     def _run_exercise(self, data: dict):
         try:
             typ = data.get("type")
+            # 先彈出獨立提示窗（帶響鈴、置頂），使用者按「Got it」後才開始輸入
+            self._notify_comment(data)
             if typ == "input":
                 self._run_input(data)
             elif typ == "pmc":
@@ -1054,7 +1087,7 @@ class GoChineseHelper:
 
         comment = data.get("comment")
         if comment:
-            self._set_status(f"✔ Done · Note: {comment}", OK_COLOR)
+            self._set_status("✔ Done · Note was shown before the run", WARN_COLOR)
         else:
             self._set_status("✔ Done", OK_COLOR)
 
@@ -1090,9 +1123,6 @@ class GoChineseHelper:
     # ---------- answer (display only) ----------
     def _run_answer(self, data: dict):
         body = "\n".join(f"• {a}" for a in data.get("answers", []))
-        comment = data.get("comment")
-        if comment:
-            body += f"\n\nNote: {comment}"
         self._show_info("Reference Answers", body or "(none)")
         self._set_status("✔ Reference answers shown", OK_COLOR)
 
